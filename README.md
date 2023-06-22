@@ -25,7 +25,7 @@ Ethereum Explorer is a Rust application that allows you to fetch information abo
 1. Clone the repository:
 
    ```bash
-   git clone https://github.com/your-username/ethereum-explorer.git
+   git clone https://github.com/kunlefash/ethereum-explorer.git
 
 
 ### Navigate Project Directory

@@ -33,10 +33,10 @@ impl GuiApp {
         // Button to fetch block information
         let block_button = Button::with_label("Get Block Info");
 
-        //Displays a block information
+        // Displays a block information
         let block_label = Label::new(None);
 
-        //Main layout
+        // Main layout
         let layout = gtk::Box::new(gtk::Orientation::Vertical, 0);
         layout.pack_start(&block_entry, false, false, 0);
         layout.pack_start(&block_button, false, false, 0);
@@ -44,7 +44,7 @@ impl GuiApp {
 
         window.add(&layout);
 
-        //Shared flag to handle shutdown
+        // Shared flag to handle shutdown
         let shutdown_flag = Arc::new(AtomicBool::new(false));
 
         // Clone data for event handlers
@@ -87,8 +87,27 @@ impl GuiApp {
     }
 
     pub fn run(&self) {
-        self.window.show_all();
-        self.runtime.enter(|| gtk::main());
+        let runtime = self.runtime.clone();
+
+        let app = self.clone();
+        self.runtime.spawn(async move {
+            gtk::timeout_add(100, move || {
+                if app.shutdown_flag.load(Ordering::Relaxed) {
+                    gtk::main_quit();
+                    Continue(false)
+                } else {
+                    Continue(true)
+                }
+            });
+
+            app.window.show_all();
+            gtk::main();
+        });
+
+        runtime.block_on(async {
+            let _ = tokio::signal::ctrl_c().await;
+            app.shutdown().await;
+        });
     }
 
     pub async fn shutdown(&self) {
@@ -97,4 +116,28 @@ impl GuiApp {
         }
         self.runtime.shutdown_timeout(std::time::Duration::from_secs(1));
     }
+}
+
+async fn get_block_info(block_number: String, web3: Arc<web3::Web3<web3::transports::Http>>) -> Result<String, String> {
+    let block_number: web3::types::U256 = match block_number.parse() {
+        Ok(number) => number,
+        Err(_) => return Err(format!("Invalid block number: {}", block_number)),
+    };
+
+    match web3.eth().block(web3::types::BlockId::Number(block_number)).await {
+        Ok(Some(block)) => Ok(format!(
+            "Block {}: Hash: {}, Timestamp: {}",
+            block_number, block.hash, block.timestamp
+        )),
+        Ok(None) => Ok(format!("Block {} not found", block_number)),
+        Err(e) => Err(format!("Failed to fetch block {}: {:?}", block_number, e)),
+    }
+}
+
+fn main() {
+    // Initialize GTK
+    gtk::init().expect("Failed to initialize GTK.");
+
+    let app = GuiApp::new();
+    app.run();
 }
