@@ -11,13 +11,13 @@ async fn main() -> std::io::Result<()> {
         .bind("127.0.0.1:8080")?
         .run();
 
-    // Initialize the GTK runtime
+
     gtk::init().expect("Failed to initialize GTK.");
 
-    // Create and run the GUI application
+    // Create the GUI application
     let gui = gui::GuiApp::new();
     gui.run();
 
-    // Shutdown the server and GTK event loop gracefully
+
     futures::try_join!(server, gui.shutdown()).map(|_| ())
 }
